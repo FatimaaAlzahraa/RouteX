@@ -5,7 +5,10 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from appRouteX.views import (
     ShipmentCreateView, AssignmentCreateView,
     ManagerAssignmentsList, DriverAssignmentsList,
-    StatusUpdateCreateView, ShipmentDetailView, AssignmentDetailView,WarehouseCreateView, WarehouseDetailView, CustomerCreateView,
+    StatusUpdateCreateView, ShipmentDetailView, AssignmentDetailView,WarehouseCreateView, 
+    WarehouseDetailView, CustomerCreateView, AutocompleteCustomersView,AutocompleteShipmentsView,
+    SyncCustomersView,CustomerQuickAddView,SyncShipmentsView,
+
 )
 
 urlpatterns = [
@@ -32,4 +35,10 @@ urlpatterns = [
 
     # تحديث الحالة من السائق
     path("api/status-updates", StatusUpdateCreateView.as_view(), name="statusupdate-create"),
+
+    path("api/autocomplete/customers", AutocompleteCustomersView.as_view(), name="ac-customers"),
+    path("api/autocomplete/shipments", AutocompleteShipmentsView.as_view(), name="ac-shipments"),
+    path("api/sync/customers", SyncCustomersView.as_view(), name="sync-customers"),
+    path("api/sync/shipments", SyncShipmentsView.as_view(), name="sync-shipments"),
+    path("api/customers/quick-add", CustomerQuickAddView.as_view(), name="customer-quick-add"),
 ]

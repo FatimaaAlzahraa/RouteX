@@ -1,6 +1,9 @@
 # appRouteX/views.py
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from django.utils.dateparse import parse_datetime
+from django.db.models import Q
 
 from .permissions import IsWarehouseManager, IsDriver
 from .models import Shipment, Assignment, StatusUpdate, WarehouseManager, Warehouse, Customer
@@ -9,6 +12,7 @@ from .serializers import (
     AssignmentSerializer,
     StatusUpdateSerializer,
     AssignmentListItemSerializer,WarehouseSerializer, CustomerSerializer,
+    CustomerLiteSerializer,ShipmentLiteSerializer
 )
 
 
@@ -18,6 +22,20 @@ class ShipmentCreateView(generics.CreateAPIView):
     queryset = Shipment.objects.select_related("warehouse")
     serializer_class = ShipmentSerializer
     permission_classes = [IsAuthenticated, IsWarehouseManager]
+
+class AutocompleteShipmentsView(generics.ListAPIView):
+    serializer_class = ShipmentLiteSerializer
+    permission_classes = [IsAuthenticated, IsWarehouseManager]
+
+    def get_queryset(self):
+        q = self.request.query_params.get("q", "").strip()
+        # المدير يشوف شحنات مخازنه فقط 
+        wm = WarehouseManager.objects.get(user=self.request.user)
+        qs = Shipment.objects.filter(warehouse__manager=wm)
+        if q:
+            qs = qs.filter(Q(name__istartswith=q) | Q(name__icontains=q))
+        return qs.order_by("name")[:20]
+
 
 # تفاصيل، تعديل، حذف شحنة
 class ShipmentDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -31,6 +49,21 @@ class ShipmentDetailView(generics.RetrieveUpdateDestroyAPIView):
         except WarehouseManager.DoesNotExist:
             return Shipment.objects.none()
         return self.queryset.filter(warehouse__manager=wm)
+
+class SyncShipmentsView(generics.ListAPIView):
+    serializer_class = ShipmentLiteSerializer
+    permission_classes = [IsAuthenticated, IsWarehouseManager]
+
+    def list(self, request, *args, **kwargs):
+        wm = WarehouseManager.objects.get(user=self.request.user)
+        updated_since = request.query_params.get("updated_since")
+        qs = Shipment.objects.filter(warehouse__manager=wm)
+        if updated_since:
+            dt = parse_datetime(updated_since)
+            if dt:
+                qs = qs.filter(updated_at__gte=dt)
+        qs = qs.order_by("updated_at")[:500]
+        return Response(self.get_serializer(qs, many=True).data)
 
 
 
@@ -107,6 +140,37 @@ class WarehouseDetailView(generics.RetrieveUpdateDestroyAPIView):
 class CustomerCreateView(generics.CreateAPIView):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
+    permission_classes = [IsAuthenticated, IsWarehouseManager]
+
+class AutocompleteCustomersView(generics.ListAPIView):
+    serializer_class = CustomerLiteSerializer
+    permission_classes = [IsAuthenticated, IsWarehouseManager]
+
+    def get_queryset(self):
+        q = self.request.query_params.get("q", "").strip()
+        qs = Customer.objects.all()
+        if q:
+            # يطابق بداية الاسم/التليفون ويقبل احتواء لاحقًا
+            qs = qs.filter(Q(name__istartswith=q) | Q(phone__istartswith=q) | Q(name__icontains=q))
+        return qs.order_by("name")[:20]  # اقتراحات سريعة
+
+class SyncCustomersView(generics.ListAPIView):
+    serializer_class = CustomerLiteSerializer
+    permission_classes = [IsAuthenticated, IsWarehouseManager]
+
+    def list(self, request, *args, **kwargs):
+        updated_since = request.query_params.get("updated_since")
+        qs = Customer.objects.all()
+        if updated_since:
+            dt = parse_datetime(updated_since)
+            if dt:
+                qs = qs.filter(updated_at__gte=dt)
+        qs = qs.order_by("updated_at")[:500]
+        return Response(self.get_serializer(qs, many=True).data)
+    
+class CustomerQuickAddView(generics.CreateAPIView):
+    queryset = Customer.objects.all()
+    serializer_class = CustomerSerializer  # موجود بالفعل وبيرفض غير المدير. :contentReference[oaicite:12]{index=12}
     permission_classes = [IsAuthenticated, IsWarehouseManager]
 
 

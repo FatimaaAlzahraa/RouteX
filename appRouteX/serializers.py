@@ -39,7 +39,17 @@ class ShipmentSerializer(serializers.ModelSerializer):
             })
 
         return attrs
+    
 
+class CustomerLiteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Customer
+        fields = ["id", "name", "phone", "updated_at"]
+
+class ShipmentLiteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shipment
+        fields = ["id", "name", "warehouse", "updated_at"]
 
 
 #ASSIGNMENTS
@@ -152,6 +162,15 @@ class StatusUpdateSerializer(serializers.ModelSerializer):
         assignment: Assignment = attrs["assignment"]
         if assignment.driver.user_id != request.user.id:
             raise PermissionDenied("You can only update the status of your own assignment.")
+        
+        acc = attrs.get("location_accuracy_m")
+        if acc is not None and acc > 30:
+            raise serializers.ValidationError({"location_accuracy_m": "GPS accuracy must be ≤ 30 meters."})
+
+        lat = attrs.get("latitude")
+        lng = attrs.get("longitude")
+        if (lat is None) ^ (lng is None):
+            raise serializers.ValidationError("Both latitude and longitude are required together.")
 
         return attrs
 

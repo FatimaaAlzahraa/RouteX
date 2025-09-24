@@ -4,6 +4,8 @@ from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.core.exceptions import ValidationError
+
 
 
 #ROOt Users Account
@@ -65,6 +67,9 @@ class Customer(models.Model):
     name = models.CharField(max_length=255)
     phone = models.CharField(max_length=20)
     address = models.CharField(max_length=255)
+
+    created_at = models.DateTimeField(auto_now_add=True)  
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         indexes = [
@@ -151,12 +156,23 @@ class StatusUpdate(models.Model):
     timestamp = models.DateTimeField(default=timezone.now, db_index=True)
     note = models.TextField(blank=True)
     attachment_url = models.URLField(blank=True)
+    proof_photo = models.ImageField(upload_to="pod/", blank=True, null=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
     class Meta:
         ordering = ["-timestamp"]
         indexes = [
             models.Index(fields=["status", "timestamp"]),
         ]
+    def clean(self):
+        # لو الدقة متبعتة، لازم ≤ 30 م
+        if self.location_accuracy_m is not None and self.location_accuracy_m > 30:
+            raise ValidationError({"location_accuracy_m": "GPS accuracy must be ≤ 30 meters."})
+        # لو واحد من الإحداثيات فقط تم ادخاله يكون فيه غلط لازم الاتنين
+        if (self.latitude is None) ^ (self.longitude is None):
+            raise ValidationError("Both latitude and longitude are required together.")
+
 
     def __str__(self):
         return f"{self.assignment.shipment} -> {self.status} @ {self.timestamp:%Y-%m-%d %H:%M}"

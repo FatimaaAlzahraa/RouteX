@@ -74,6 +74,8 @@ WSGI_APPLICATION = 'project.wsgi.application'
 AUTH_USER_MODEL = "appRouteX.CustomUser"   
 
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 
 
