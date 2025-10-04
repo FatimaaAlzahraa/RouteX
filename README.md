@@ -57,3 +57,37 @@ The driver can:
     python -m venv venv
     source venv/bin/activate   # On Windows use: venv\Scripts\activate
 
+4. **Install dependencies** 
+   ```bash
+   Install dependencies
+
+5. **Run migrations** 
+   ```bash 
+   pyhron manage.py makemigrationspy
+   python manage.py migrate
+
+6. **Start the development server**
+    ```bash 
+    python manage.py runserver
+
+
+---
+
+
+### Usage
+
+- Login as a Manager:
+
+Create warehouses, clients, and shipments.
+
+Assign shipments to drivers.
+
+Monitor delivery progress.
+
+- Login as a Driver:
+
+View shipments assigned to you.
+
+Update shipment statuses as you deliver them.
+
+- Shipment statuses update automatically in the manager’s dashboard.
