@@ -16,7 +16,7 @@ class LoginSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
 
-        # اختياري: إنشاء البروفايل حسب الدور
+        #  إنشاء البروفايل حسب الدور
         if user.role == CustomUser.Roles.DRIVER:
             Driver.objects.create(user=user)
         elif user.role == CustomUser.Roles.WAREHOUSE_MANAGER:
