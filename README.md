@@ -74,20 +74,21 @@ The driver can:
 ---
 
 
-### Usage
+## Usage
 
-- Login as a Manager:
+### Login as a Manager:
 
-Create warehouses, clients, and shipments.
+- Create warehouses, clients, and shipments.
 
-Assign shipments to drivers.
+- Assign shipments to drivers.
 
-Monitor delivery progress.
+- Monitor delivery progress.
 
-- Login as a Driver:
 
-View shipments assigned to you.
+### Login as a Driver:
 
-Update shipment statuses as you deliver them.
+- View shipments assigned to you.
+
+- Update shipment statuses as you deliver them.
 
 - Shipment statuses update automatically in the manager’s dashboard.
