@@ -47,7 +47,6 @@ The driver can:
    ```bash
    git clone https://github.com/FatimaaAlzahraa/RouteX.git
 
-
 2. **Navigate into the project directory** 
     ```bash
      cd RouteX
@@ -55,7 +54,7 @@ The driver can:
 3. **Create and activate a virtual environment**
     ```bash
     python -m venv venv
-    source venv/bin/activate   # On Windows use: venv\Scripts\activate
+    source venv\Scripts\activate  #On Windows
 
 4. **Install dependencies** 
    ```bash
@@ -69,7 +68,6 @@ The driver can:
 6. **Start the development server**
     ```bash 
     python manage.py runserver
-
 
 ---
 
