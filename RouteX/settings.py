@@ -158,3 +158,15 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+import os
+DEBUG = False
+ALLOWED_HOSTS = ["RouteX.pythonanywhere.com"]
+CSRF_TRUSTED_ORIGINS = ["https://RouteX.pythonanywhere.com"]
+
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "static"
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"

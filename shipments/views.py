@@ -1,14 +1,17 @@
 # shipments/views.py
 from rest_framework import generics 
+from django.db.models import Exists, OuterRef, Subquery, Case, When, Value, BooleanField, F
+from django.db.models import Exists, OuterRef, Subquery
+from rest_framework import viewsets, filters
 from django.db.models import Q
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers as drf_serializers
 from .permissions import IsWarehouseManager, IsDriver
-from .models import Shipment, StatusUpdate, WarehouseManager, Customer, Warehouse
+from .models import Shipment, StatusUpdate, WarehouseManager, Customer, Warehouse, Driver
 from .serializers import (
     StatusUpdateSerializer,ShipmentSerializer,
-    CustomerSerializer, WarehouseSerializer, 
+    CustomerSerializer, WarehouseSerializer, DriverStatusSerializer
 )
 
 
@@ -73,6 +76,12 @@ class AutocompleteShipmentsView(generics.ListAPIView):
 class WarehouseCreateView(generics.CreateAPIView):
     queryset = Warehouse.objects.all()
     serializer_class = WarehouseSerializer
+    permission_classes = [IsWarehouseManager]
+
+# 6) detail/update/delete customer (warehouse manager only)
+class CustomerDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Customer.objects.all()
+    serializer_class = CustomerSerializer
     permission_classes = [IsWarehouseManager]
 
 
@@ -167,9 +176,10 @@ class DriverShipmentsList(generics.ListAPIView):
 
         # fields to keep in this endpoint
         keep = {
+            "id",
             "warehouse",
             "shipment_details",
-            "driver", "driver_display_name",
+            "driver", "driver_username",
             "customer_display_name",
             "customer_address",
             "notes",
@@ -196,3 +206,56 @@ class StatusUpdateCreateView(generics.CreateAPIView):
     queryset = StatusUpdate.objects.select_related("shipment", "shipment__driver")
     serializer_class = StatusUpdateSerializer
     permission_classes = [IsDriver]
+
+
+
+
+class DriverStatusView(viewsets.ReadOnlyModelViewSet):
+    serializer_class = DriverStatusSerializer
+    permission_classes = [IsWarehouseManager]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["user__username", "user__phone"]
+
+    def get_queryset(self):
+        # آخر StatusUpdate لكل سائق
+        latest_update_qs = (
+            StatusUpdate.objects
+            .filter(shipment__driver=OuterRef("pk"))
+            .order_by("-timestamp")
+        )
+
+        # شحنة نشطة (لو محتاجاها)
+        ACTIVE_STATUSES = ["ASSIGNED", "IN_TRANSIT"]
+        active_shipment_qs = (
+            Shipment.objects
+            .filter(driver=OuterRef("pk"))
+            .annotate(
+                _last_status=Subquery(
+                    StatusUpdate.objects
+                    .filter(shipment=OuterRef("pk"))
+                    .order_by("-timestamp")
+                    .values("status")[:1]
+                )
+            )
+            .filter(_last_status__in=ACTIVE_STATUSES)
+            .order_by("-updated_at")
+            .values("id")[:1]
+        )
+
+        qs = (
+            Driver.objects.select_related("user")
+            .annotate(
+                last_status   = Subquery(latest_update_qs.values("status")[:1]),
+                last_seen_at  = Subquery(latest_update_qs.values("timestamp")[:1]),
+                current_active_shipment_id = Subquery(active_shipment_qs),
+            )
+            .annotate(
+                effective_is_active=Case(
+                    When(last_status="DELIVERED", then=Value(True)),
+                    default=F("is_active"),
+                    output_field=BooleanField(),
+                )
+            )
+            .order_by("user__username", "pk")
+        )
+        return qs
