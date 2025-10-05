@@ -88,7 +88,7 @@ class ShipmentSerializer(serializers.ModelSerializer):
                 "allowed_addresses": allowed,
             })
 
-        # كل تمام
+
         attrs["customer_address"] = addr_clean
         return attrs
 
