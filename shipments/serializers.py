@@ -60,7 +60,6 @@ class ShipmentSerializer(serializers.ModelSerializer):
         if not WarehouseManager.objects.filter(user=request.user).exists():
             raise PermissionDenied("Only warehouse managers can create/update shipments.")
 
-        # تحديد العميل (سواء مبعوت في الطلب أو موجود على الـ instance)
         customer = attrs.get("customer", getattr(self.instance, "customer", None))
 
         # 1) لو مفيش عميل: نلغي أي عنوان مبعوت ونكمل عادي
