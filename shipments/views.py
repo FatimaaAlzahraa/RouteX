@@ -217,14 +217,12 @@ class DriverStatusView(viewsets.ReadOnlyModelViewSet):
     search_fields = ["user__username", "user__phone"]
 
     def get_queryset(self):
-        # آخر StatusUpdate لكل سائق
         latest_update_qs = (
             StatusUpdate.objects
             .filter(shipment__driver=OuterRef("pk"))
             .order_by("-timestamp")
         )
 
-        # شحنة نشطة (لو محتاجاها)
         ACTIVE_STATUSES = ["ASSIGNED", "IN_TRANSIT"]
         active_shipment_qs = (
             Shipment.objects
