@@ -126,7 +126,7 @@ class CustomerSerializer(serializers.ModelSerializer):
         # drop empty addresses from output
         data = super().to_representation(instance)
         for key in ["address", "address2", "address3"]:
-            if not data.get(key):  # None أو ""
+            if not data.get(key): 
                 data.pop(key, None)
         return data
 
@@ -177,7 +177,6 @@ class DriverStatusSerializer(serializers.ModelSerializer):
     user_username = serializers.CharField(source="user.username", read_only=True)
     user_phone    = serializers.CharField(source="user.phone", read_only=True)
 
-    # من effective_is_active
     is_active = serializers.BooleanField(source="effective_is_active", read_only=True)
 
     last_status = serializers.CharField(read_only=True, allow_null=True)

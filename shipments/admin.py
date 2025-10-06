@@ -108,7 +108,7 @@ class ShipmentAdminForm(forms.ModelForm):
         if addresses:
             self.fields["customer_address"].choices = [("", "choose")] + [(a, a) for a in addresses]
             if len(addresses) == 1:
-                # لو عنوان واحد – هنكمّله تلقائيًا لو المستخدم ما اختارش حاجة
+                # لو عنوان واحد – تلقائيًا املأه
                 self.fields["customer_address"].initial = addresses[0]
         else:
             self.fields["customer_address"].choices = [("", "— اختر العميل أولاً —")]
@@ -135,12 +135,12 @@ class ShipmentAdminForm(forms.ModelForm):
             self.add_error("customer_address", "لا يمكن حفظ الشحنة بدون عنوان للعميل.")
             return cleaned
 
-        # عنوان واحد → املأ تلقائيًا إذا كان فارغًا
+        # عنوان واحد : املأ تلقائيًا إذا كان فارغًا
         if len(allowed) == 1 and not addr:
             cleaned["customer_address"] = allowed[0]
             return cleaned
 
-        # أكثر من عنوان → مطلوب اختيار واحد
+        # أكثر من عنوان : مطلوب اختيار واحد
         if not addr:
             self.add_error("customer_address", "الرجاء اختيار عنوان للعميل.")
             return cleaned
