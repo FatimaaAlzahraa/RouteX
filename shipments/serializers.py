@@ -9,16 +9,14 @@ from .models import (
 
 
 class ShipmentSerializer(serializers.ModelSerializer):
-    # إدخال السائق بالـ id (اختياري)
+    # إدخال السائق بالـ id 
     driver = serializers.PrimaryKeyRelatedField(
         queryset=Driver.objects.all(), required=False, allow_null=True
     )
-    # للعرض فقط: اسم المستخدم الخاص بالسائق
     driver_username = serializers.CharField(source="driver.user.username", read_only=True)
 
     # بيانات العميل
     customer_name = serializers.CharField(source="customer.name", read_only=True)
-    # هنسيبه غير إجباري على مستوى الحقل، لكن نلزم به في validate لو customer موجود
     customer_address = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
@@ -62,12 +60,10 @@ class ShipmentSerializer(serializers.ModelSerializer):
 
         customer = attrs.get("customer", getattr(self.instance, "customer", None))
 
-        # 1) لو مفيش عميل: نلغي أي عنوان مبعوت ونكمل عادي
         if not customer:
             attrs["customer_address"] = None
             return attrs
-
-        # 2) عندنا عميل → لازم يبعت customer_address & يكون ضمن عناوينه
+        
         allowed = self._customer_addresses_list(customer)
         if not allowed:
             raise ValidationError({"customer_address": "Customer has no saved addresses to use."})
