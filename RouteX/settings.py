@@ -12,10 +12,9 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
-from celery.schedules import crontab
-
 import os
 import sys
+import environ
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -23,8 +22,24 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-9royn!xam$$k66j*d!bz$y64lsmgphvqdrog7badq+q07nc%$8'
+env = environ.Env()
+
+env_file = BASE_DIR / ".env"
+if env_file.exists():
+    environ.Env.read_env(env_file)
+
+
+SECRET_KEY = env("DJANGO_SECRET_KEY")             
+DEBUG = env.bool("DEBUG", default=False)
+
+
+ALLOWED_HOSTS = env.list(
+    "ALLOWED_HOSTS",
+    default=["127.0.0.1", "localhost", "zahraaayop.pythonanywhere.com", ".pythonanywhere.com"],
+)
+
+if not DEBUG and not SECRET_KEY:
+    raise RuntimeError("DJANGO_SECRET_KEY must be set in production.")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -162,9 +177,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 
-DEBUG = False
-ALLOWED_HOSTS = ["zahraaayop.pythonanywhere.com"]
-CSRF_TRUSTED_ORIGINS = ["https://zahraaayop.pythonanywhere.com"]
+# DEBUG = False
+# ALLOWED_HOSTS = ["zahraaayop.pythonanywhere.com"]
+# CSRF_TRUSTED_ORIGINS = ["https://zahraaayop.pythonanywhere.com"]
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "static"
@@ -172,3 +187,15 @@ STATIC_ROOT = BASE_DIR / "static"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+DEBUG = True  
+
+ALLOWED_HOSTS = [
+    "zahraaayop.pythonanywhere.com",   # الإنتاج
+    "127.0.0.1", "localhost", "[::1]", # المحلي
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://zahraaayop.pythonanywhere.com",  # الإنتاج
+    "http://127.0.0.1:8000",                  # المحلي
+    "http://localhost:8000",
+]

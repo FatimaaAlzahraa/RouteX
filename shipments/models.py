@@ -4,6 +4,7 @@ from django.conf import settings
 
 
 
+
 class Driver(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
@@ -15,9 +16,7 @@ class Driver(models.Model):
         indexes = [models.Index(fields=["is_active"])]
 
     def __str__(self):
-        # مفيش name — نعرض username/phone
-        phone = getattr(self.user, "phone", "")
-        return f"Driver: {self.user.username} ({phone})" if phone else f"Driver: {self.user.username}"
+        return f"Driver: {self.user.username}"
 
 
 class WarehouseManager(models.Model):  
