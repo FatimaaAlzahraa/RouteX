@@ -3,9 +3,8 @@ from shipments.views import (
     ShipmentCreateView, ShipmentDetailView,
     DriverShipmentsList,
     StatusUpdateCreateView, WarehouseCreateView, WarehouseDetailView, CustomerCreateView,
-    ShipmentsListView, AutocompleteShipmentsView,AutocompleteCustomersView,DriverStatusView,CustomerDetailView
+    ShipmentsListView, AutocompleteShipmentsView,AutocompleteCustomersView,DriverStatusView,CustomerDetailView,CustomerAddressesView
 )
-
 urlpatterns = [
     # Shipments (إنشاء، تعديل، حذف، تفاصيل)
     path("api/shipments", ShipmentCreateView.as_view(), name="shipment-create"),
@@ -19,6 +18,8 @@ urlpatterns = [
     #  ادارة العملاء (انشاء /تعديل/حذف/تفاصيل) (للإدارة فقط)
     path("api/customers", CustomerCreateView.as_view(), name="customer-create"),
     path("api/customers/<int:pk>", CustomerDetailView.as_view(), name="customer-detail"),
+    # قائمة عناوين العميل
+    path("customers/<int:pk>/addresses", CustomerAddressesView.as_view(), name="customer-addresses"),
     # بحث بالاقتراحات الفورية للعملاء
     path("api/autocomplete/customers", AutocompleteCustomersView.as_view(), name="ac-customers"),
 

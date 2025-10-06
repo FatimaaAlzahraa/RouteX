@@ -181,11 +181,7 @@ class DriverStatusSerializer(serializers.ModelSerializer):
     is_active = serializers.BooleanField(source="effective_is_active", read_only=True)
 
     last_status = serializers.CharField(read_only=True, allow_null=True)
-    last_seen_at = serializers.DateTimeField(
-        format="%Y-%m-%d %I:%M%p",
-        default_timezone=timezone.get_current_timezone, 
-        read_only=True,
-    )
+    last_seen_at = serializers.DateTimeField(read_only=True, allow_null=True)
     current_active_shipment_id = serializers.IntegerField(read_only=True, allow_null=True)
 
     class Meta:

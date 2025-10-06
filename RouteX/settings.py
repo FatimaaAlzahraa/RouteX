@@ -65,8 +65,7 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "shipments.tz_middleware.TimezoneMiddleware", 
+    "django.contrib.auth.middleware.AuthenticationMiddleware", 
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -93,9 +92,7 @@ AUTH_USER_MODEL = "users.CustomUser"
 
 
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = "UTC"
-REST_FRAMEWORK = {"DATETIME_FORMAT": None}  
-
+TIME_ZONE = "Asia/Riyadh"
 USE_I18N = True
 USE_TZ = True
 
@@ -180,10 +177,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # CSRF_TRUSTED_ORIGINS = ["https://zahraaayop.pythonanywhere.com"]
 
 STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR / "static"
+# STATIC_ROOT = BASE_DIR / "static"
 
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# MEDIA_URL = "/media/"
+# MEDIA_ROOT = BASE_DIR / "media"
 
 DEBUG = True  
 
