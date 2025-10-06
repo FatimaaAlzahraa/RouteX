@@ -190,12 +190,12 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEBUG = True  
 
 ALLOWED_HOSTS = [
-    "zahraaayop.pythonanywhere.com",   # الإنتاج
-    "127.0.0.1", "localhost", "[::1]", # المحلي
+    "zahraaayop.pythonanywhere.com",  
+    "127.0.0.1", "localhost", "[::1]", 
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://zahraaayop.pythonanywhere.com",  # الإنتاج
-    "http://127.0.0.1:8000",                  # المحلي
+    "https://zahraaayop.pythonanywhere.com", 
+    "http://127.0.0.1:8000",                  
     "http://localhost:8000",
 ]
