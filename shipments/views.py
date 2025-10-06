@@ -1,7 +1,6 @@
 # shipments/views.py
 from rest_framework import generics 
 from rest_framework.response import Response
-
 from django.db.models import Exists, OuterRef, Subquery, Case, When, Value, BooleanField, F
 from rest_framework import viewsets, filters
 from django.db.models import Q
@@ -111,12 +110,8 @@ class CustomerCreateView(generics.CreateAPIView):
 
 # 8) customer addresses list (warehouse manager only)
 class CustomerAddressesView(generics.RetrieveAPIView):
-    """
-    GET /api/customers/<pk>/addresses/
-    يعيد قائمة عناوين العميل (address / address2 / address3) بدون فراغات.
-    """
     queryset = Customer.objects.all()
-    permission_classes = [IsWarehouseManager]  # لو عايزة تسمحي للدرايفر بدّليها
+    permission_classes = [IsWarehouseManager] 
 
     def retrieve(self, request, *args, **kwargs):
         customer = self.get_object()
