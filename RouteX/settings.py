@@ -41,10 +41,8 @@ ALLOWED_HOSTS = env.list(
 if not DEBUG and not SECRET_KEY:
     raise RuntimeError("DJANGO_SECRET_KEY must be set in production.")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
 
-ALLOWED_HOSTS = []
+
 
 
 # Application definition
@@ -93,9 +91,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'RouteX.wsgi.application'
 AUTH_USER_MODEL = "users.CustomUser"   
 
-
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
 
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = "UTC"
@@ -171,7 +166,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
