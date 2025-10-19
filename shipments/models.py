@@ -30,6 +30,23 @@ class WarehouseManager(models.Model):
         return f"WM: {self.user.username} ({phone})" if phone else f"WM: {self.user.username}"
 
 
+
+class Product(models.Model):
+    name= models.CharField(max_length=200)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    unit = models.CharField(max_length=50, blank=True, default='قطعة')  # وحدة القياس
+    stock_qty = models.PositiveIntegerField(default=0)  # المخزون 
+    image = models.ImageField(upload_to='products/', blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name
+
+
 class Warehouse(models.Model):
     name = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
@@ -75,6 +92,9 @@ class ShipmentStatus(models.TextChoices):
 
 
 class Shipment(models.Model):
+    product = models.ForeignKey(
+        Product, on_delete=models.PROTECT, related_name="shipments", null=True, blank=True
+    )
     warehouse = models.ForeignKey(
         Warehouse, on_delete=models.PROTECT, related_name="shipments"
     )
@@ -85,9 +105,7 @@ class Shipment(models.Model):
         Customer, on_delete=models.PROTECT, related_name="shipments", null=True, blank=True
     )
     customer_address = models.CharField(max_length=255, null=True, blank=True)
-
-    shipment_details = models.TextField(max_length=1000, null=True, blank=False, help_text="Details about the shipment contents.")
-    notes = models.TextField(blank=True)
+    notes = models.TextField(blank=True, null=True,default="")
     assigned_at = models.DateTimeField(default=timezone.now)
     current_status = models.CharField(max_length=20, default=ShipmentStatus.NEW, choices=ShipmentStatus.choices, db_index=True, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)

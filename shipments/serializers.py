@@ -4,32 +4,42 @@ from users.models import CustomUser
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from .models import (
     WarehouseManager, Warehouse, Customer, Shipment,
-    StatusUpdate, Driver
+    StatusUpdate, Driver,Product
 )
 
 
+class ProductSerializer(serializers.ModelSerializer):
+    shipments_count = serializers.IntegerField(read_only=True)
+    class Meta:
+        model  = Product
+        fields = ["id", "name", "price", "unit", "stock_qty", "is_active",
+                  "created_at", "shipments_count"]
+        read_only_fields = ["created_at", "shipments_count"]
+
 class ShipmentSerializer(serializers.ModelSerializer):
-    # إدخال السائق بالـ id 
     driver = serializers.PrimaryKeyRelatedField(
         queryset=Driver.objects.all(), required=False, allow_null=True
     )
     driver_username = serializers.CharField(source="driver.user.username", read_only=True)
-
-    # بيانات العميل
     customer_name = serializers.CharField(source="customer.name", read_only=True)
     customer_address = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    product = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(), required=False, allow_null=True
+    )
+    product_name = serializers.CharField(source="product.name", read_only=True)
 
     class Meta:
         model = Shipment
         fields = [
             "id",
             "warehouse",
-            "driver",           
-            "driver_username",  
+            "product",      
+            "product_name", 
+            "driver",
+            "driver_username",
             "customer",
             "customer_name",
             "customer_address",
-            "shipment_details",
             "notes",
             "current_status",
             "created_at",
@@ -37,9 +47,8 @@ class ShipmentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "created_at", "updated_at", "current_status",
-            "driver_username", "customer_name",
+            "driver_username", "customer_name", "product_name",
         ]
-
 
     def _customer_addresses_list(self, customer: Customer):
         return [
@@ -49,7 +58,6 @@ class ShipmentSerializer(serializers.ModelSerializer):
                 getattr(customer, "address3", None),
             ] if v
         ]
-
 
     def validate(self, attrs):
         request = self.context["request"]
@@ -63,7 +71,7 @@ class ShipmentSerializer(serializers.ModelSerializer):
         if not customer:
             attrs["customer_address"] = None
             return attrs
-        
+
         allowed = self._customer_addresses_list(customer)
         if not allowed:
             raise ValidationError({"customer_address": "Customer has no saved addresses to use."})
@@ -71,7 +79,6 @@ class ShipmentSerializer(serializers.ModelSerializer):
         addr = attrs.get("customer_address", None)
         addr_clean = None if addr is None else str(addr).strip()
 
-        # لازم يختار عنوان صراحة (حتى لو عنوان واحد بس)
         if not addr_clean:
             raise ValidationError({
                 "customer_address": "Customer selected. You must choose one of the customer's saved addresses.",
@@ -83,7 +90,6 @@ class ShipmentSerializer(serializers.ModelSerializer):
                 "customer_address": "Address must be one of the customer's saved addresses.",
                 "allowed_addresses": allowed,
             })
-
 
         attrs["customer_address"] = addr_clean
         return attrs
@@ -173,24 +179,31 @@ class StatusUpdateSerializer(serializers.ModelSerializer):
 
 
 # DRIVER STATUS
+
 class DriverStatusSerializer(serializers.ModelSerializer):
-    user_username = serializers.CharField(source="user.username", read_only=True)
-    user_phone    = serializers.CharField(source="user.phone", read_only=True)
-
-    is_active = serializers.BooleanField(source="effective_is_active", read_only=True)
-
-    last_status = serializers.CharField(read_only=True, allow_null=True)
-    last_seen_at = serializers.DateTimeField(read_only=True, allow_null=True)
-    current_active_shipment_id = serializers.IntegerField(read_only=True, allow_null=True)
+    name   = serializers.CharField(source="user.username", read_only=True)
+    phone  = serializers.CharField(source="user.phone", read_only=True)
+    status = serializers.SerializerMethodField()
+    # اختياري: لو عايز ترجعهم للـ UI
+    last_seen_at = serializers.DateTimeField(read_only=True)
+    current_active_shipment_id = serializers.IntegerField(read_only=True)
 
     class Meta:
-        model = Driver
+        model  = Driver
         fields = [
             "id",
-            "user_username",
-            "user_phone",
-            "is_active",
-            "last_status",
+            "name",
+            "phone",
+            "status",
             "last_seen_at",
             "current_active_shipment_id",
         ]
+
+    def get_status(self, obj):
+        # busy if has active shipment
+        if getattr(obj, "current_active_shipment_id", None):
+            return "مشغول"
+        # available if effectively active
+        if getattr(obj, "effective_is_active", False):
+            return "متاح"
+        return "غير متاح"

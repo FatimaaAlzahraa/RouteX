@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django import forms
-from .models import Driver, WarehouseManager, Warehouse, Customer, Shipment, StatusUpdate
+from .models import Driver, WarehouseManager, Warehouse,Customer, Shipment, StatusUpdate, Product
+
 
 
 
@@ -55,12 +56,20 @@ class WarehouseAdmin(admin.ModelAdmin):
     search_fields = ("name", "location")
     date_hierarchy = "created_at"
 
+
+@admin.register(Product)
+class ProductAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "unit", "price", "stock_qty", "is_active", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("name",)
+    ordering = ("-created_at",)
+
+
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
     list_display = ("name", "phone", "address")
     search_fields = ("name", "phone")
     list_per_page = 50
-
 
 
 
@@ -156,13 +165,13 @@ class ShipmentAdminForm(forms.ModelForm):
 @admin.register(Shipment)
 class ShipmentAdmin(admin.ModelAdmin):
     form = ShipmentAdminForm
-    autocomplete_fields = ("warehouse", "driver", "customer")
+    autocomplete_fields = ("product" , "warehouse", "driver", "customer")
 
-    list_display = ("id", "warehouse", "driver", "customer",
+    list_display = ("id", "product","warehouse", "driver", "customer",
                     "customer_address", "current_status", "created_at")
     list_filter = ("warehouse", "current_status")
     search_fields = ("id", "warehouse__name", "warehouse__location",
-                     "customer__name", "customer_address")
+                     "customer__name", "customer_address","product__name")
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
 

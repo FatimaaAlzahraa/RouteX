@@ -1,5 +1,7 @@
 # shipments/views.py
 from rest_framework import generics 
+from django.db.models import Count, ProtectedError
+from rest_framework import generics, status
 from rest_framework.response import Response
 from django.db.models import Exists, OuterRef, Subquery, Case, When, Value, BooleanField, F
 from rest_framework import viewsets, filters
@@ -7,23 +9,58 @@ from django.db.models import Q
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers as drf_serializers
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .permissions import IsWarehouseManager, IsDriver
-from .models import Shipment, StatusUpdate, WarehouseManager, Customer, Warehouse, Driver
+from .models import Shipment, StatusUpdate, WarehouseManager, Customer, Warehouse, Driver, Product
 from .serializers import (
     StatusUpdateSerializer,ShipmentSerializer,
-    CustomerSerializer, WarehouseSerializer, DriverStatusSerializer
+    CustomerSerializer, WarehouseSerializer, DriverStatusSerializer, ProductSerializer
 )
 
+# 1) المنتجات: قائمة + إنشاء (مدير المستودع فقط)
+class ProductListCreateView(generics.ListCreateAPIView):
+    serializer_class = ProductSerializer
+    permission_classes = [IsWarehouseManager]
+    queryset = Product.objects.all().annotate(shipments_count=Count('shipments'))
+    parser_classes = [MultiPartParser, FormParser, JSONParser]   # ← مهم
 
-# 1) Shipment create (warehouse manager only)
+
+# 2) المنتجات: تفاصيل + تعديل + حذف (مدير المستودع فقط)
+class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = ProductSerializer
+    permission_classes = [IsWarehouseManager]
+    queryset = Product.objects.all().annotate(shipments_count=Count('shipments'))
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        try:
+            self.perform_destroy(instance)
+        except ProtectedError:
+            return Response(
+                {
+                    "detail": "لا يمكن حذف المنتج لوجود شحنات مرتبطة به.",
+                    "shipments_count": getattr(instance, "shipments_count", None),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+
+
+    
+
+# 3) Shipment create (warehouse manager only)
 class ShipmentCreateView(generics.CreateAPIView):
-    queryset = Shipment.objects.select_related("warehouse", "driver__user", "customer")
+    queryset = Shipment.objects.select_related("product","warehouse", "driver__user", "customer")
     serializer_class = ShipmentSerializer
     permission_classes = [IsWarehouseManager]
 
-# 2) detail/update/delete shipment (warehouse manager only)
+# 4) detail/update/delete shipment (warehouse manager only)
 class ShipmentDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Shipment.objects.select_related("warehouse", "driver__user", "customer")
+    queryset = Shipment.objects.select_related("product","warehouse", "driver__user", "customer")
     serializer_class = ShipmentSerializer
     permission_classes = [IsWarehouseManager]
 
@@ -32,7 +69,7 @@ class ShipmentDetailView(generics.RetrieveUpdateDestroyAPIView):
                 else Shipment.objects.none())
 
 
-# 3) system-wide shipments list (warehouse manager only)
+# 5) system-wide shipments list (warehouse manager only)
 class ShipmentsListView(generics.ListAPIView):
     permission_classes = [IsWarehouseManager]
     serializer_class = ShipmentSerializer  
@@ -41,7 +78,7 @@ class ShipmentsListView(generics.ListAPIView):
         if not WarehouseManager.objects.filter(user=self.request.user).exists():
             return Shipment.objects.none()
 
-        qs = Shipment.objects.select_related("warehouse", "driver__user", "customer")
+        qs = Shipment.objects.select_related("product","warehouse", "driver__user", "customer")
         updated_since = self.request.query_params.get("updated_since")
         if updated_since:
             dt = parse_datetime(updated_since)
@@ -50,7 +87,7 @@ class ShipmentsListView(generics.ListAPIView):
         return qs.order_by("-updated_at")[:500]
 
 
-# 4) Autocomplete shipments (warehouse manager only)
+# 6) Autocomplete shipments (warehouse manager only)
 class AutocompleteShipmentsView(generics.ListAPIView):
     serializer_class = ShipmentSerializer  
     permission_classes = [IsWarehouseManager]
@@ -60,32 +97,27 @@ class AutocompleteShipmentsView(generics.ListAPIView):
             return Shipment.objects.none()
 
         q = (self.request.query_params.get("q") or "").strip()
-        qs = Shipment.objects.select_related("customer", "driver__user", "warehouse")
+        qs = Shipment.objects.select_related("product","customer", "driver__user", "warehouse")
         if q:
             if q.isdigit():
                 qs = qs.filter(id=int(q))
             else:
-            # search in shipment_details text field
-                qs = qs.filter(shipment_details__icontains=q)
+                qs = qs.filter(
+                    Q(product__name__icontains=q) |  # ⬅️ بحث باسم المنتج
+                      Q(notes__icontains=q)
+                )
         return qs.order_by("-updated_at")[:20]
 
 
-
-
-# 5) warehouse create (warehouse manager only)
-class WarehouseCreateView(generics.CreateAPIView):
+# 7) warehouse create (warehouse manager only)
+class WarehouseListCreateView(generics.ListCreateAPIView):
     queryset = Warehouse.objects.all()
     serializer_class = WarehouseSerializer
     permission_classes = [IsWarehouseManager]
 
-# 6) detail/update/delete customer (warehouse manager only)
-class CustomerDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Customer.objects.all()
-    serializer_class = CustomerSerializer
-    permission_classes = [IsWarehouseManager]
 
 
-# 6) detail/update/delete warehouse (warehouse manager only)
+# 8) detail/update/delete warehouse (warehouse manager only)
 class WarehouseDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = WarehouseSerializer
     permission_classes = [IsWarehouseManager]
@@ -97,18 +129,28 @@ class WarehouseDetailView(generics.RetrieveUpdateDestroyAPIView):
         except WarehouseManager.DoesNotExist:
             return Warehouse.objects.none()
         return self.queryset
+    
 
 
 
 
-# 7) customer create (warehouse manager only)
-class CustomerCreateView(generics.CreateAPIView):
+
+# 9) customer create (warehouse manager only)
+class CustomerListCreateView(generics.ListCreateAPIView):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
     permission_classes = [IsWarehouseManager]
 
 
-# 8) customer addresses list (warehouse manager only)
+
+# 10) detail/update/delete customer (warehouse manager only)
+class CustomerDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Customer.objects.all()
+    serializer_class = CustomerSerializer
+    permission_classes = [IsWarehouseManager]
+
+
+# 11) customer addresses list (warehouse manager only)
 class CustomerAddressesView(generics.RetrieveAPIView):
     queryset = Customer.objects.all()
     permission_classes = [IsWarehouseManager] 
@@ -121,7 +163,7 @@ class CustomerAddressesView(generics.RetrieveAPIView):
             "addresses": addresses
         })
 
-# 8) Autocomplete customers (warehouse manager only)
+# 12) Autocomplete customers (warehouse manager only)
 class AutocompleteCustomersView(generics.ListAPIView):
     """
     search param: q
@@ -173,14 +215,14 @@ class AutocompleteCustomersView(generics.ListAPIView):
 
 
 
-# 9) list shipments assigned to the logged-in driver
+# 13) list shipments assigned to the logged-in driver
 class DriverShipmentsList(generics.ListAPIView):
     serializer_class = ShipmentSerializer
     permission_classes = [IsDriver]
 
     def get_queryset(self):
         return (Shipment.objects
-                .select_related("driver__user", "warehouse", "customer")
+                .select_related("product", "driver__user", "warehouse", "customer")
                 .filter(driver__user=self.request.user)
                 .order_by("-assigned_at"))
 
@@ -191,14 +233,13 @@ class DriverShipmentsList(generics.ListAPIView):
         keep = {
             "id",
             "warehouse",
-            "shipment_details",
+            "product", "product_name",   # ⬅️ إضافة
             "driver", "driver_username",
-            "customer_display_name",
-            "customer_address",
+            "customer", "customer_name", "customer_address",
             "notes",
             "current_status",
             "created_at", "updated_at",
-        }
+            }
 
         if isinstance(serializer, drf_serializers.ListSerializer):
             fields = serializer.child.fields  
@@ -213,7 +254,7 @@ class DriverShipmentsList(generics.ListAPIView):
         return serializer
     
 
-# 10) driver posts a status update for a shipment
+# 14) driver posts a status update for a shipment
 class StatusUpdateCreateView(generics.CreateAPIView):
     parser_classes = [MultiPartParser, FormParser]
     queryset = StatusUpdate.objects.select_related("shipment", "shipment__driver")
@@ -223,50 +264,51 @@ class StatusUpdateCreateView(generics.CreateAPIView):
 
 
 
+# 15) driver status list (warehouse manager only)
 class DriverStatusView(viewsets.ReadOnlyModelViewSet):
-    serializer_class = DriverStatusSerializer
+    serializer_class  = DriverStatusSerializer
     permission_classes = [IsWarehouseManager]
-    filter_backends = [filters.SearchFilter]
-    search_fields = ["user__username", "user__phone"]
+    filter_backends   = [filters.SearchFilter]
+    search_fields     = ["user__username", "user__phone"]
 
     def get_queryset(self):
-        latest_update_qs = (
-            StatusUpdate.objects
-            .filter(shipment__driver=OuterRef("pk"))
-            .order_by("-timestamp")
-        )
+      latest_update_qs = (
+          StatusUpdate.objects
+          .filter(shipment__driver=OuterRef("pk"))
+          .order_by("-timestamp")
+      )
 
-        ACTIVE_STATUSES = ["ASSIGNED", "IN_TRANSIT"]
-        active_shipment_qs = (
-            Shipment.objects
-            .filter(driver=OuterRef("pk"))
-            .annotate(
-                _last_status=Subquery(
-                    StatusUpdate.objects
-                    .filter(shipment=OuterRef("pk"))
-                    .order_by("-timestamp")
-                    .values("status")[:1]
-                )
-            )
-            .filter(_last_status__in=ACTIVE_STATUSES)
-            .order_by("-updated_at")
-            .values("id")[:1]
-        )
+      ACTIVE_STATUSES = ["ASSIGNED", "IN_TRANSIT"]
+      active_shipment_qs = (
+          Shipment.objects
+          .filter(driver=OuterRef("pk"))
+          .annotate(
+              _last_status=Subquery(
+                  StatusUpdate.objects
+                  .filter(shipment=OuterRef("pk"))
+                  .order_by("-timestamp")
+                  .values("status")[:1]
+              )
+          )
+          .filter(_last_status__in=ACTIVE_STATUSES)
+          .order_by("-updated_at")
+          .values("id")[:1]
+      )
 
-        qs = (
-            Driver.objects.select_related("user")
-            .annotate(
-                last_status   = Subquery(latest_update_qs.values("status")[:1]),
-                last_seen_at  = Subquery(latest_update_qs.values("timestamp")[:1]),
-                current_active_shipment_id = Subquery(active_shipment_qs),
-            )
-            .annotate(
-                effective_is_active=Case(
-                    When(last_status="DELIVERED", then=Value(True)),
-                    default=F("is_active"),
-                    output_field=BooleanField(),
-                )
-            )
-            .order_by("user__username", "pk")
-        )
-        return qs
+      qs = (
+          Driver.objects.select_related("user")
+          .annotate(
+              last_status   = Subquery(latest_update_qs.values("status")[:1]),
+              last_seen_at  = Subquery(latest_update_qs.values("timestamp")[:1]),
+              current_active_shipment_id = Subquery(active_shipment_qs),
+          )
+          .annotate(
+              effective_is_active=Case(
+                  When(last_status="DELIVERED", then=Value(True)),
+                  default=F("is_active"),
+                  output_field=BooleanField(),
+              )
+          )
+          .order_by("user__username", "pk")
+      )
+      return qs
