@@ -88,7 +88,6 @@ class ShipmentStatus(models.TextChoices):
     ASSIGNED = "ASSIGNED", "Assigned"
     IN_TRANSIT = "IN_TRANSIT", "In transit"
     DELIVERED = "DELIVERED", "Delivered"
-    CANCELLED = "CANCELLED", "Cancelled"
 
 
 class Shipment(models.Model):

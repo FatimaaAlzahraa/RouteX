@@ -10,12 +10,13 @@ from rest_framework.permissions import IsAuthenticated
 from shipments.models import WarehouseManager, Driver
 
 
+
 User = get_user_model()
 
 def normalize_phone(phone: str) -> str:
-    # طبّعي الرقم حسب نظامك (اختياري): إزالة مسافات/شرطات.. الخ
     return ''.join(ch for ch in (phone or '') if ch.isdigit())
 
+# login view 
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
@@ -36,17 +37,17 @@ class LoginView(APIView):
         if not user.check_password(password) or not user.is_active:
             return Response({'detail': 'invalid credentials'}, status=401)
 
-        # توليد التوكنات
+
         refresh = RefreshToken.for_user(user)
         access  = refresh.access_token
 
-        # تحديد الدور من الجداول عندك
+        # role detection
         if WarehouseManager.objects.filter(user=user).exists():
             role = 'manager'
         elif Driver.objects.filter(user=user).exists():
             role = 'driver'
         else:
-            role = 'driver'  # default لو حبيتي
+            role = 'driver'  
 
         return Response({
             'access' : str(access),
@@ -54,13 +55,14 @@ class LoginView(APIView):
             'role'   : role,
             'user'   : {
                 'id'      : user.id,
-                'username': user.username,  # هنعرضه في الـ Profile
+                'username': user.username, 
                 'phone'   : user.phone,
             }
         }, status=200)
 
 
 
+# whois view returning user info and role
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def whois(request):

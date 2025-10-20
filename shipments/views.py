@@ -17,7 +17,7 @@ from .serializers import (
     CustomerSerializer, WarehouseSerializer, DriverStatusSerializer, ProductSerializer
 )
 
-# 1) المنتجات: قائمة + إنشاء (مدير المستودع فقط)
+# 1) product list/create (warehouse manager only)
 class ProductListCreateView(generics.ListCreateAPIView):
     serializer_class = ProductSerializer
     permission_classes = [IsWarehouseManager]
@@ -25,14 +25,14 @@ class ProductListCreateView(generics.ListCreateAPIView):
     parser_classes = [MultiPartParser, FormParser, JSONParser]   # ← مهم
 
 
-# 2) المنتجات: تفاصيل + تعديل + حذف (مدير المستودع فقط)
+# 2) product detail/update/delete (warehouse manager only)
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ProductSerializer
     permission_classes = [IsWarehouseManager]
     queryset = Product.objects.all().annotate(shipments_count=Count('shipments'))
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
-    
+
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         try:
@@ -133,8 +133,6 @@ class WarehouseDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 
-
-
 # 9) customer create (warehouse manager only)
 class CustomerListCreateView(generics.ListCreateAPIView):
     queryset = Customer.objects.all()
@@ -178,7 +176,7 @@ class AutocompleteCustomersView(generics.ListAPIView):
     def get_queryset(self):
         q = (self.request.query_params.get("q") or "").strip()
 
-        # لازم WM profile
+
         if not WarehouseManager.objects.filter(user=self.request.user).exists():
             return Customer.objects.none()
 
@@ -233,7 +231,7 @@ class DriverShipmentsList(generics.ListAPIView):
         keep = {
             "id",
             "warehouse",
-            "product", "product_name",   # ⬅️ إضافة
+            "product", "product_name",  
             "driver", "driver_username",
             "customer", "customer_name", "customer_address",
             "notes",

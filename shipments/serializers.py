@@ -8,6 +8,7 @@ from .models import (
 )
 
 
+# PRODUCTS
 class ProductSerializer(serializers.ModelSerializer):
     shipments_count = serializers.IntegerField(read_only=True)
     class Meta:
@@ -16,6 +17,8 @@ class ProductSerializer(serializers.ModelSerializer):
                   "created_at", "shipments_count"]
         read_only_fields = ["created_at", "shipments_count"]
 
+
+# SHIPMENTS
 class ShipmentSerializer(serializers.ModelSerializer):
     driver = serializers.PrimaryKeyRelatedField(
         queryset=Driver.objects.all(), required=False, allow_null=True
@@ -62,7 +65,6 @@ class ShipmentSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         request = self.context["request"]
 
-        # الإنشاء/التعديل: مدير المخزن فقط
         if not WarehouseManager.objects.filter(user=request.user).exists():
             raise PermissionDenied("Only warehouse managers can create/update shipments.")
 
@@ -109,6 +111,8 @@ class WarehouseSerializer(serializers.ModelSerializer):
             raise PermissionDenied("Only warehouse managers can create/update warehouses.")
         return attrs
 
+
+
 # CUSTOMERS
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
@@ -135,6 +139,8 @@ class CustomerSerializer(serializers.ModelSerializer):
             if not data.get(key): 
                 data.pop(key, None)
         return data
+
+
 
 # STATUSUPDATE
 class StatusUpdateSerializer(serializers.ModelSerializer):
@@ -179,12 +185,10 @@ class StatusUpdateSerializer(serializers.ModelSerializer):
 
 
 # DRIVER STATUS
-
 class DriverStatusSerializer(serializers.ModelSerializer):
     name   = serializers.CharField(source="user.username", read_only=True)
     phone  = serializers.CharField(source="user.phone", read_only=True)
     status = serializers.SerializerMethodField()
-    # اختياري: لو عايز ترجعهم للـ UI
     last_seen_at = serializers.DateTimeField(read_only=True)
     current_active_shipment_id = serializers.IntegerField(read_only=True)
 
