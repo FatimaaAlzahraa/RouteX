@@ -97,5 +97,5 @@ The driver can:
 Production: https://zahraaayop.pythonanywhere.com/admin
 - "usernamr": zahraa
 - "paswward": za1234za 
-PythonAnywhere Dashboard for this app:
-https://www.pythonanywhere.com/user/zahraaayop/webapps/#tab_id_zahraaayop_pythonanywhere_com
+
+
