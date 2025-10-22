@@ -38,7 +38,8 @@ The driver can:
 - **Backend:** Django 
 - **Database:** sqlite3  
 - **Authentication:** JWT Auth 
-- **API Type:** RESTful APIs  
+- **API Type:** RESTful APIs
+-  
 
 ---
 
