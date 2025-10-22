@@ -11,6 +11,7 @@ Each user type has specific permissions, ensuring a secure and efficient workflo
 
 ### 🧭 Warehouse Manager
 The warehouse manager has full access to administrative operations, including:
+- creating **product**
 - Creating and managing **shipments**
 - Managing **warehouses** and **customers**
 - Assigning shipments to drivers
@@ -90,3 +91,11 @@ The driver can:
 - Update shipment statuses as you deliver them.
 
 - Shipment statuses update automatically in the manager’s dashboard.
+
+
+### Live Demo
+Production: https://zahraaayop.pythonanywhere.com/admin
+"usernamr": zahraa
+"paswward": za1234za
+PythonAnywhere Dashboard for this app:
+https://www.pythonanywhere.com/user/zahraaayop/webapps/#tab_id_zahraaayop_pythonanywhere_com
