@@ -1,15 +1,15 @@
 # shipments/views.py
-from rest_framework import generics 
+from rest_framework import generics , status
 from django.db.models import Count, ProtectedError
-from rest_framework import generics, status
 from rest_framework.response import Response
-from django.db.models import Exists, OuterRef, Subquery, Case, When, Value, BooleanField, F
+from django.db.models import OuterRef, Subquery, Case, When, Value, BooleanField, F
 from rest_framework import viewsets, filters
 from django.db.models import Q
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers as drf_serializers
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.exceptions import ValidationError
+from django.db import transaction
 from .permissions import IsWarehouseManager, IsDriver
 from .models import Shipment, StatusUpdate, WarehouseManager, Customer, Warehouse, Driver, Product
 from .serializers import (
@@ -50,23 +50,33 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 
-    
-
 # 3) Shipment create (warehouse manager only)
 class ShipmentCreateView(generics.CreateAPIView):
     queryset = Shipment.objects.select_related("product","warehouse", "driver__user", "customer")
     serializer_class = ShipmentSerializer
     permission_classes = [IsWarehouseManager]
 
+
 # 4) detail/update/delete shipment (warehouse manager only)
 class ShipmentDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Shipment.objects.select_related("product","warehouse", "driver__user", "customer")
+    queryset = Shipment.objects.select_related("product", "warehouse", "driver__user", "customer")
     serializer_class = ShipmentSerializer
     permission_classes = [IsWarehouseManager]
 
     def get_queryset(self):
-        return (self.queryset if WarehouseManager.objects.filter(user=self.request.user).exists()
-                else Shipment.objects.none())
+        return (
+            self.queryset
+            if WarehouseManager.objects.filter(user=self.request.user).exists()
+            else Shipment.objects.none()
+        )
+
+    @transaction.atomic
+    def perform_destroy(self, instance: Shipment):
+        if instance.driver_id and instance.product_id:
+            Product.objects.filter(pk=instance.product_id).update(
+                stock_qty=F("stock_qty") + 1
+            )
+        super().perform_destroy(instance)
 
 
 # 5) system-wide shipments list (warehouse manager only)
@@ -255,9 +265,37 @@ class DriverShipmentsList(generics.ListAPIView):
 # 14) driver posts a status update for a shipment
 class StatusUpdateCreateView(generics.CreateAPIView):
     parser_classes = [MultiPartParser, FormParser]
-    queryset = StatusUpdate.objects.select_related("shipment", "shipment__driver")
+    queryset = StatusUpdate.objects.select_related("shipment", "shipment__driver", "shipment__product")
     serializer_class = StatusUpdateSerializer
     permission_classes = [IsDriver]
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+
+        
+        su: StatusUpdate = serializer.save()  
+        shipment: Shipment = su.shipment
+
+        start_statuses = {"ASSIGNED", "IN_TRANSIT", "DELIVERED"}
+
+        if shipment.current_status == "NEW" and su.status in start_statuses:
+            product = shipment.product
+            if not product:
+                raise ValidationError({"product": "Shipment has no linked product to decrement stock."})
+
+
+            updated = (
+                Product.objects
+                .select_for_update()
+                .filter(pk=product.pk, stock_qty__gt=0)
+                .update(stock_qty=F("stock_qty") - 1)
+            )
+            if not updated:
+                raise ValidationError({"stock_qty": "Not enough stock to assign this shipment."})
+            
+        
+        shipment.current_status = su.status
+        shipment.save(update_fields=["current_status", "updated_at"])
 
 
 

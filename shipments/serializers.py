@@ -1,7 +1,9 @@
 from rest_framework import serializers
 from django.utils import timezone
 from users.models import CustomUser
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
+from django.db.models import F
+from rest_framework.exceptions import ValidationError, PermissionDenied
 from .models import (
     WarehouseManager, Warehouse, Customer, Shipment,
     StatusUpdate, Driver,Product
@@ -36,8 +38,8 @@ class ShipmentSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "warehouse",
-            "product",      
-            "product_name", 
+            "product",
+            "product_name",
             "driver",
             "driver_username",
             "customer",
@@ -54,49 +56,106 @@ class ShipmentSerializer(serializers.ModelSerializer):
         ]
 
     def _customer_addresses_list(self, customer: Customer):
-        return [
-            v for v in [
-                getattr(customer, "address", None),
-                getattr(customer, "address2", None),
-                getattr(customer, "address3", None),
-            ] if v
-        ]
+        return [v for v in [
+            getattr(customer, "address", None),
+            getattr(customer, "address2", None),
+            getattr(customer, "address3", None),
+        ] if v]
+
+    def _reserve_stock(self, product: Product, qty: int = 1):
+
+        updated = Product.objects.filter(
+            pk=product.pk, stock_qty__gte=qty
+        ).update(stock_qty=F("stock_qty") - qty)
+        if updated == 0:
+            raise ValidationError({"product": "الكمية في المخزون غير كافية."})
+
+    def _release_stock(self, product: Product, qty: int = 1):
+        Product.objects.filter(pk=product.pk).update(stock_qty=F("stock_qty") + qty)
 
     def validate(self, attrs):
         request = self.context["request"]
-
         if not WarehouseManager.objects.filter(user=request.user).exists():
             raise PermissionDenied("Only warehouse managers can create/update shipments.")
-
+        
         customer = attrs.get("customer", getattr(self.instance, "customer", None))
-
         if not customer:
             attrs["customer_address"] = None
-            return attrs
+        else:
+            allowed = self._customer_addresses_list(customer)
+            if not allowed:
+                raise ValidationError({"customer_address": "Customer has no saved addresses to use."})
+            addr = attrs.get("customer_address", getattr(self.instance, "customer_address", None))
+            addr_clean = None if addr is None else str(addr).strip()
+            if not addr_clean:
+                raise ValidationError({
+                    "customer_address": "Customer selected. You must choose one of the customer's saved addresses.",
+                    "allowed_addresses": allowed,
+                })
+            if addr_clean not in allowed:
+                raise ValidationError({
+                    "customer_address": "Address must be one of the customer's saved addresses.",
+                    "allowed_addresses": allowed,
+                })
+            attrs["customer_address"] = addr_clean
 
-        allowed = self._customer_addresses_list(customer)
-        if not allowed:
-            raise ValidationError({"customer_address": "Customer has no saved addresses to use."})
+        new_driver = attrs.get("driver", getattr(self.instance, "driver", None))
+        new_product = attrs.get("product", getattr(self.instance, "product", None))
 
-        addr = attrs.get("customer_address", None)
-        addr_clean = None if addr is None else str(addr).strip()
+        need_new_reservation = False
+        if new_driver and new_product:
+            if self.instance is None:
+                need_new_reservation = True                    
+            else:
+                old_driver = self.instance.driver
+                old_product = self.instance.product
+                if not old_driver:                               
+                    need_new_reservation = True
+                elif old_product != new_product:                 
+                    need_new_reservation = True
 
-        if not addr_clean:
-            raise ValidationError({
-                "customer_address": "Customer selected. You must choose one of the customer's saved addresses.",
-                "allowed_addresses": allowed,
-            })
+        if need_new_reservation and new_product and new_product.stock_qty <= 0:
+            raise ValidationError({"product": "الكمية في المخزون غير كافية."})
 
-        if addr_clean not in allowed:
-            raise ValidationError({
-                "customer_address": "Address must be one of the customer's saved addresses.",
-                "allowed_addresses": allowed,
-            })
-
-        attrs["customer_address"] = addr_clean
         return attrs
 
+    @transaction.atomic
+    def create(self, validated_data):
+        driver = validated_data.get("driver")
+        product = validated_data.get("product")
+        obj = super().create(validated_data)
+        if driver and product:
+            self._reserve_stock(product, 1)
+        return obj
 
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        old_driver = instance.driver
+        old_product = instance.product
+
+        new_driver = validated_data.get("driver", old_driver)
+        new_product = validated_data.get("product", old_product)
+
+        obj = super().update(instance, validated_data)
+
+        # حالات التعديل:
+        if not old_driver and new_driver:
+            if new_product:
+                self._reserve_stock(new_product, 1)
+
+        elif old_driver and not new_driver:
+            if old_product:
+                self._release_stock(old_product, 1)
+
+        elif old_driver and new_driver and old_product != new_product:
+            if old_product:
+                self._release_stock(old_product, 1)
+            if new_product:
+                self._reserve_stock(new_product, 1)
+
+        return obj
+    
+    
 
 # WAREHOUSE
 class WarehouseSerializer(serializers.ModelSerializer):
@@ -109,6 +168,31 @@ class WarehouseSerializer(serializers.ModelSerializer):
         request = self.context["request"]
         if not WarehouseManager.objects.filter(user=request.user).exists():
             raise PermissionDenied("Only warehouse managers can create/update warehouses.")
+
+        name = (attrs.get("name", getattr(self.instance, "name", "")) or "").strip()
+        location = (attrs.get("location", getattr(self.instance, "location", "")) or "").strip()
+
+        if not name:
+            raise ValidationError({"name": "اسم المستودع مطلوب."})
+        if not location:
+            raise ValidationError({"location": "الموقع/العنوان مطلوب."})
+
+        attrs["name"] = name
+        attrs["location"] = location
+
+        # منع تكرار (الاسم + العنوان) معًا 
+        qs = Warehouse.objects.filter(
+            name__iexact=name,
+            location__iexact=location,
+        )
+        if self.instance is not None:
+            qs = qs.exclude(pk=self.instance.pk)
+
+        if qs.exists():
+            raise ValidationError({
+                "non_field_errors": ["يوجد مستودع بنفس الاسم ونفس العنوان بالفعل."]
+            })
+
         return attrs
 
 
@@ -150,8 +234,19 @@ class StatusUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StatusUpdate
-        fields = ["id", "shipment", "customer_name", "customer_phone", "status", "timestamp", "note",
-                  "photo", "latitude", "longitude", "location_accuracy_m"]  
+        fields = [
+            "id",
+            "shipment",
+            "customer_name",
+            "customer_phone",
+            "status",
+            "timestamp",
+            "note",
+            "photo",
+            "latitude",
+            "longitude",
+            "location_accuracy_m",
+        ]
 
     def validate(self, attrs):
         request = self.context["request"]
@@ -170,7 +265,7 @@ class StatusUpdateSerializer(serializers.ModelSerializer):
         acc = attrs.get("location_accuracy_m")
         if acc is not None and acc > 30:
             raise serializers.ValidationError({"location_accuracy_m": "GPS accuracy must be ≤ 30 meters."})
-        
+
         # both latitude and longitude must be provided together
         lat, lng = attrs.get("latitude"), attrs.get("longitude")
         if (lat is None) ^ (lng is None):
@@ -180,7 +275,6 @@ class StatusUpdateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data["timestamp"] = timezone.now()
         return super().create(validated_data)
-
 
 
 
