@@ -28,27 +28,15 @@ env_file = BASE_DIR / ".env"
 if env_file.exists():
     environ.Env.read_env(env_file)
 
-
 SECRET_KEY = env("DJANGO_SECRET_KEY")             
 DEBUG = env.bool("DEBUG", default=False)
-
-
-# ALLOWED_HOSTS = env.list(
-#     "ALLOWED_HOSTS",
-#     default=["127.0.0.1", "localhost", "zahraaayop.pythonanywhere.com", ".pythonanywhere.com"],
-# )
 
 if not DEBUG and not SECRET_KEY:
     raise RuntimeError("DJANGO_SECRET_KEY must be set in production.")
 
 
-# ALLOWED_HOSTS = ["https://fcb76ec8c5c6.ngrok-free.app", '127.0.0.1' , 'localhost',"172.20.10.2"]
-
-
-
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -97,7 +85,6 @@ LANGUAGE_CODE = 'en-us'
 TIME_ZONE = "Asia/Riyadh"
 USE_I18N = True
 USE_TZ = True
-
 
 
 SIMPLE_JWT = {
@@ -172,40 +159,26 @@ AUTH_PASSWORD_VALIDATORS = [
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
-
-# DEBUG = False
-# ALLOWED_HOSTS = ["zahraaayop.pythonanywhere.com"]
-# CSRF_TRUSTED_ORIGINS = ["https://zahraaayop.pythonanywhere.com"]
-
 STATIC_URL = "/static/"
-# STATIC_ROOT = BASE_DIR / "static"
+STATIC_ROOT = BASE_DIR / "static"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 
 
-# ALLOWED_HOSTS = [
-#     "zahraaayop.pythonanywhere.com",  
-#     "127.0.0.1", "localhost", "[::1]", 
-# ]
-
 DEBUG = True  
-
 ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "zahraaayop.pythonanywhere.com",
     ".pythonanywhere.com",
     ".ngrok-free.app",          
-    # أو بديله لو عايزة ثبّتي واحد محدد:
-    # "fcb76ec8c5c6.ngrok-free.app",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://zahraaayop.pythonanywhere.com",
     "http://127.0.0.1:8000",
     "http://localhost:8000",
-    "https://*.ngrok-free.app",  # للطلبات عبر المتصفح/بوستمان على HTTPS
+    "https://*.ngrok-free.app",  
 ]

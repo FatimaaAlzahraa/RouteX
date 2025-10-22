@@ -1,10 +1,8 @@
 # shipments/views.py
 from rest_framework import generics , status
-from django.db.models import Count, ProtectedError
+from django.db.models import Count, ProtectedError, OuterRef, Subquery, Case, When, Value, BooleanField, F,Q
 from rest_framework.response import Response
-from django.db.models import OuterRef, Subquery, Case, When, Value, BooleanField, F
 from rest_framework import viewsets, filters
-from django.db.models import Q
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers as drf_serializers
@@ -17,15 +15,17 @@ from .serializers import (
     CustomerSerializer, WarehouseSerializer, DriverStatusSerializer, ProductSerializer
 )
 
+
 # 1) product list/create (warehouse manager only)
 class ProductListCreateView(generics.ListCreateAPIView):
     serializer_class = ProductSerializer
     permission_classes = [IsWarehouseManager]
     queryset = Product.objects.all().annotate(shipments_count=Count('shipments'))
-    parser_classes = [MultiPartParser, FormParser, JSONParser]   # ← مهم
+    parser_classes = [MultiPartParser, FormParser, JSONParser]   
 
 
-# 2) product detail/update/delete (warehouse manager only)
+
+# 2) product detail/update/delete (warehouse manager only) 
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ProductSerializer
     permission_classes = [IsWarehouseManager]
@@ -79,7 +79,7 @@ class ShipmentDetailView(generics.RetrieveUpdateDestroyAPIView):
         super().perform_destroy(instance)
 
 
-# 5) system-wide shipments list (warehouse manager only)
+# 5) shipments list (warehouse manager only)
 class ShipmentsListView(generics.ListAPIView):
     permission_classes = [IsWarehouseManager]
     serializer_class = ShipmentSerializer  
@@ -113,7 +113,7 @@ class AutocompleteShipmentsView(generics.ListAPIView):
                 qs = qs.filter(id=int(q))
             else:
                 qs = qs.filter(
-                    Q(product__name__icontains=q) |  # ⬅️ بحث باسم المنتج
+                    Q(product__name__icontains=q) |  #Search by product name
                       Q(notes__icontains=q)
                 )
         return qs.order_by("-updated_at")[:20]
@@ -174,11 +174,9 @@ class CustomerAddressesView(generics.RetrieveAPIView):
 # 12) Autocomplete customers (warehouse manager only)
 class AutocompleteCustomersView(generics.ListAPIView):
     """
-    search param: q
-      - q isdigit => match id/phone
-      - q text => match name/phone
-    20 results max, ordered by -updated_at
-    without WM profile => empty queryset
+    معامل البحث: q
+    - q isdigit => تطابق المعرف/الهاتف
+    - q text => تطابق الاسم/الهاتف
     """
     serializer_class = CustomerSerializer
     permission_classes = [IsWarehouseManager]
@@ -220,87 +218,7 @@ class AutocompleteCustomersView(generics.ListAPIView):
         return serializer
 
 
-
-
-
-# 13) list shipments assigned to the logged-in driver
-class DriverShipmentsList(generics.ListAPIView):
-    serializer_class = ShipmentSerializer
-    permission_classes = [IsDriver]
-
-    def get_queryset(self):
-        return (Shipment.objects
-                .select_related("product", "driver__user", "warehouse", "customer")
-                .filter(driver__user=self.request.user)
-                .order_by("-assigned_at"))
-
-    def get_serializer(self, *args, **kwargs):
-        serializer = super().get_serializer(*args, **kwargs)
-
-        # fields to keep in this endpoint
-        keep = {
-            "id",
-            "warehouse",
-            "product", "product_name",  
-            "driver", "driver_username",
-            "customer", "customer_name", "customer_address",
-            "notes",
-            "current_status",
-            "created_at", "updated_at",
-            }
-
-        if isinstance(serializer, drf_serializers.ListSerializer):
-            fields = serializer.child.fields  
-        else:
-            fields = serializer.fields
-
-        # cancelled field is excluded
-        for name in list(fields):
-            if name not in keep:
-                fields.pop(name)
-
-        return serializer
-    
-
-# 14) driver posts a status update for a shipment
-class StatusUpdateCreateView(generics.CreateAPIView):
-    parser_classes = [MultiPartParser, FormParser]
-    queryset = StatusUpdate.objects.select_related("shipment", "shipment__driver", "shipment__product")
-    serializer_class = StatusUpdateSerializer
-    permission_classes = [IsDriver]
-
-    @transaction.atomic
-    def perform_create(self, serializer):
-
-        
-        su: StatusUpdate = serializer.save()  
-        shipment: Shipment = su.shipment
-
-        start_statuses = {"ASSIGNED", "IN_TRANSIT", "DELIVERED"}
-
-        if shipment.current_status == "NEW" and su.status in start_statuses:
-            product = shipment.product
-            if not product:
-                raise ValidationError({"product": "Shipment has no linked product to decrement stock."})
-
-
-            updated = (
-                Product.objects
-                .select_for_update()
-                .filter(pk=product.pk, stock_qty__gt=0)
-                .update(stock_qty=F("stock_qty") - 1)
-            )
-            if not updated:
-                raise ValidationError({"stock_qty": "Not enough stock to assign this shipment."})
-            
-        
-        shipment.current_status = su.status
-        shipment.save(update_fields=["current_status", "updated_at"])
-
-
-
-
-# 15) driver status list (warehouse manager only)
+# 13) driver status list (warehouse manager only)
 class DriverStatusView(viewsets.ReadOnlyModelViewSet):
     serializer_class  = DriverStatusSerializer
     permission_classes = [IsWarehouseManager]
@@ -348,3 +266,59 @@ class DriverStatusView(viewsets.ReadOnlyModelViewSet):
           .order_by("user__username", "pk")
       )
       return qs
+    
+
+
+# 14) list shipments assigned to the logged-in driver
+class DriverShipmentsList(generics.ListAPIView):
+    serializer_class = ShipmentSerializer
+    permission_classes = [IsDriver]
+
+    def get_queryset(self):
+        return (Shipment.objects
+                .select_related("product", "driver__user", "warehouse", "customer")
+                .filter(driver__user=self.request.user)
+                .order_by("-assigned_at"))
+
+    def get_serializer(self, *args, **kwargs):
+        serializer = super().get_serializer(*args, **kwargs)
+
+        keep = {
+            "id",
+            "warehouse",
+            "product_name",  
+            "driver_username",
+            "customer_name", "customer_address",
+            "notes",
+            "current_status",
+            "created_at", "updated_at",
+            }
+
+        if isinstance(serializer, drf_serializers.ListSerializer):
+            fields = serializer.child.fields  
+        else:
+            fields = serializer.fields
+
+        for name in list(fields):
+            if name not in keep:
+                fields.pop(name)
+
+        return serializer
+    
+
+
+# 15) driver posts a status update for a shipment
+class StatusUpdateCreateView(generics.CreateAPIView):
+    parser_classes = [MultiPartParser, FormParser]
+    queryset = StatusUpdate.objects.select_related("shipment", "shipment__driver", "shipment__product")
+    serializer_class = StatusUpdateSerializer
+    permission_classes = [IsDriver]
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        su: StatusUpdate = serializer.save()
+        shipment: Shipment = su.shipment
+
+        if shipment.current_status != su.status:
+            shipment.current_status = su.status
+            shipment.save(update_fields=["current_status", "updated_at"])

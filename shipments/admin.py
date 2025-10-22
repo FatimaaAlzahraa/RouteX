@@ -74,7 +74,7 @@ class CustomerAdmin(admin.ModelAdmin):
 class ShipmentAdminForm(forms.ModelForm):
     customer_address = forms.ChoiceField(
         required=False,  
-        choices=[("", "— اختر العميل أولاً —")],
+        choices=[("", "Choose the client first—")],
         label="Customer address",
     )
 
@@ -117,7 +117,7 @@ class ShipmentAdminForm(forms.ModelForm):
             if len(addresses) == 1:
                 self.fields["customer_address"].initial = addresses[0]
         else:
-            self.fields["customer_address"].choices = [("", "— اختر العميل أولاً —")]
+            self.fields["customer_address"].choices = [("", "— Choose the client first—")]
 
     def clean(self):
         cleaned = super().clean()
