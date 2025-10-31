@@ -96,7 +96,5 @@ The driver can:
 
 ### Live Demo
 Production: https://zahraaayop.pythonanywhere.com/admin
-- "usernamr": zahraa
-- "paswward": za1234za 
 
 
