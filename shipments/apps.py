@@ -5,5 +5,5 @@ class AppRouteXConfig(AppConfig):
     name = "shipments"   
 
     def ready(self):
-        from . import signals  # noqa
+        from . import signals  
 

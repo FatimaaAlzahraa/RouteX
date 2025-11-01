@@ -34,8 +34,8 @@ class WarehouseManager(models.Model):
 class Product(models.Model):
     name= models.CharField(max_length=200)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    unit = models.CharField(max_length=50, blank=True, default='كيلو') 
-    stock_qty = models.PositiveIntegerField(default=0)  # المخزون 
+    unit = models.CharField(max_length=50, blank=True, default='KG') 
+    stock_qty = models.PositiveIntegerField(default=0)  # stock quantity 
     image = models.ImageField(upload_to='products/', blank=True, null=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

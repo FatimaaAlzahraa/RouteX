@@ -26,7 +26,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
 # SHIPMENTS
 class ShipmentSerializer(serializers.ModelSerializer):
-    # السائق يمكن أن يكون فارغ (الشحنة غير مخصصة بعد)
+    # driver can be empty (shipment not yet assigned)
     driver = serializers.PrimaryKeyRelatedField(
         queryset=Driver.objects.all(), required=False, allow_null=True
     )
@@ -34,7 +34,6 @@ class ShipmentSerializer(serializers.ModelSerializer):
     customer_name   = serializers.CharField(source="customer.name", read_only=True)
     customer_address = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
-    # لا يمكن وضع المنتج فارغ
     product = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.all()
     )
@@ -59,7 +58,7 @@ class ShipmentSerializer(serializers.ModelSerializer):
         ]
 
     def _customer_addresses_list(self, customer: Customer):
-        # إرجاع جميع حقول العناوين غير الفارغة للعميل
+
         return [v for v in [
             getattr(customer, "address", None),
             getattr(customer, "address2", None),
@@ -68,31 +67,31 @@ class ShipmentSerializer(serializers.ModelSerializer):
 
 
     def _reserve_stock(self, product: Product, qty: int = 1):
-        #انخفض المخزون تدريجيًا إذا توفرت كمية كافية
+
         updated = Product.objects.filter(
             pk=product.pk, stock_qty__gte=qty
         ).update(stock_qty=F("stock_qty") - qty)
         if updated == 0:
-            raise ValidationError({"المنتج": "عدد المخزن غير كافي."})
+            raise ValidationError({"product": "Insufficient stock quantity."})
 
     def _release_stock(self, product: Product, qty: int = 1):
-        # زيادة المخزون مرة أخرى (يستخدم عند تغيير المنتج)
+        # increase stock again (used when product changes)
         Product.objects.filter(pk=product.pk).update(stock_qty=F("stock_qty") + qty)
 
     # validation 
     def validate(self, attrs):
         request = self.context["request"]
         if not WarehouseManager.objects.filter(user=request.user).exists():
-            raise PermissionDenied("يمكن فقط لمديري المستودعات إنشاء/تحديث الشحنات.")
+            raise PermissionDenied("Only warehouse managers can create/update shipments.")
 
-        #  العميل وعنوانه
+        # customer and address
         customer = attrs.get("customer", getattr(self.instance, "customer", None))
         if not customer:
             attrs["customer_address"] = None
         else:
             allowed = self._customer_addresses_list(customer)
             if not allowed:
-                raise ValidationError({"customer_address": "ليس لدى العميل أي عناوين محفوظة لاستخدامها."})
+                raise ValidationError({"customer_address": "The customer has no saved addresses to use."})
 
             addr = attrs.get("customer_address", getattr(self.instance, "customer_address", None))
             addr_clean = None if addr is None else str(addr).strip()
@@ -100,14 +99,14 @@ class ShipmentSerializer(serializers.ModelSerializer):
             if not addr_clean:
                 # Customer chosen but no address provided
                 raise ValidationError({
-                    "customer_address": "تم اختيار العميل. يجب عليك اختيار أحد عناوين العميل المحفوظة.",
+                    "customer_address": "A customer has been selected. You must choose one of the customer's saved addresses.",
                     "allowed_addresses": allowed,
                 })
 
             if addr_clean not in allowed:
                 # Address must be one of the customer's addresses
                 raise ValidationError({
-                    "customer_address": "يجب أن يكون العنوان أحد العناوين المحفوظة لدى العميل.",
+                    "customer_address": "The address must be one of the customer's saved addresses.",
                     "allowed_addresses": allowed,
                 })
 
@@ -116,7 +115,7 @@ class ShipmentSerializer(serializers.ModelSerializer):
         new_driver  = attrs.get("driver",  getattr(self.instance, "driver",  None))
         new_product = attrs.get("product", getattr(self.instance, "product", None))
 
-        #  التأكد من المخزون عندما يتم تعيين سائق بمنتج
+        # check stock when assigning driver with product
         need_new_reservation = False
         if new_driver and new_product:
             if self.instance is None:
@@ -133,14 +132,14 @@ class ShipmentSerializer(serializers.ModelSerializer):
 
         if need_new_reservation and new_product and new_product.stock_qty <= 0:
             # Fast-fail before hitting DB update
-            raise ValidationError({"المنتج": "الكمية المتوفرة في المخزون غير كافية"})
+            raise ValidationError({"product": "Insufficient available stock quantity."})
 
         return attrs
 
-    # ------- create/update -------
+    # create/update
     @transaction.atomic
     def create(self, validated_data):
-        # إنشاء شحنة، ثم حجز المخزون إذا تم تعيين كل من السائق والمنتج
+        # Create shipment, then reserve stock if both driver and product are assigned
         driver  = validated_data.get("driver")
         product = validated_data.get("product")
 
@@ -153,7 +152,7 @@ class ShipmentSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        # تحديث الشحنة ومطابقة المخزون عند تغيير التعيين (السائق، المنتج).
+        # Update shipment and adjust stock when assignment (driver, product) changes.
         old_driver  = instance.driver
         old_product = instance.product
 
@@ -184,7 +183,7 @@ class ShipmentSerializer(serializers.ModelSerializer):
 
 
 
-# WAREHOUSE (المستودعات)
+# WAREHOUSE
 class WarehouseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Warehouse
@@ -194,35 +193,35 @@ class WarehouseSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         request = self.context["request"]
         if not WarehouseManager.objects.filter(user=request.user).exists():
-            raise PermissionDenied("يمكن لمديري المستودعات فقط إنشاء/تحديث المستودعات")
+            raise PermissionDenied("Only warehouse managers can create/update warehouses.")
 
         # Normalize inputs 
         name     = (attrs.get("name",     getattr(self.instance, "name",     "")) or "").strip()
         location = (attrs.get("location", getattr(self.instance, "location", "")) or "").strip()
 
         if not name:
-            raise ValidationError({"الاسم": "اسم المستودع مطلوب"})
+            raise ValidationError({"name": "Warehouse name is required."})
         if not location:
-            raise ValidationError({"الموقع": "الموقع/العنوان مطلوب"})
+            raise ValidationError({"location": "Location/address is required."})
 
         attrs["name"] = name
         attrs["location"] = location
 
-        #يمنع تكرار نفس الاسم والموقع معا 
+        # prevent duplicate name + location
         qs = Warehouse.objects.filter(name__iexact=name, location__iexact=location)
         if self.instance is not None:
             qs = qs.exclude(pk=self.instance.pk)
 
         if qs.exists():
             raise ValidationError({
-                "non_field_errors": ["يوجد بالفعل مستودع بنفس الاسم والعنوان."]
+                "non_field_errors": ["A warehouse with the same name and address already exists."]
             })
 
         return attrs
 
 
 
-# CUSTOMERS (العملاء)
+# CUSTOMERS
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Customer
@@ -232,14 +231,14 @@ class CustomerSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         request = self.context["request"]
         if not WarehouseManager.objects.filter(user=request.user).exists():
-            raise PermissionDenied("يمكن لمديري المستودعات فقط إنشاء/تحديث العملاء")
+            raise PermissionDenied("Only warehouse managers can create/update customers.")
 
         addr  = (attrs.get("address")  or "").strip()
         addr2 = (attrs.get("address2") or "").strip()
         addr3 = (attrs.get("address3") or "").strip()
 
         if not (addr or addr2 or addr3):
-            raise ValidationError({"العناوين": "قم بتوفير واحد على الأقل من العناوين"})
+            raise ValidationError({"addresses": "Provide at least one address."})
 
         return attrs
 
@@ -252,7 +251,7 @@ class CustomerSerializer(serializers.ModelSerializer):
 
 
 
-# STATUS UPDATE (Driver) (تحديث الشحنة المعينة للسائق)
+# STATUS UPDATE (Driver)
 class StatusUpdateSerializer(serializers.ModelSerializer):
     # Set by server at creation time
     timestamp = serializers.DateTimeField(read_only=True)
@@ -279,11 +278,11 @@ class StatusUpdateSerializer(serializers.ModelSerializer):
         try:
             driver_profile = Driver.objects.get(user=request.user)
         except Driver.DoesNotExist:
-            raise PermissionDenied("يمكن للسائقين فقط إنشاء تحديثات الحالة")
+            raise PermissionDenied("Only drivers can create status updates.")
 
         shipment: Shipment = attrs["shipment"]
         if not shipment.driver or shipment.driver_id != driver_profile.id:
-            raise PermissionDenied("يمكنك فقط تحديث حالة شحنتك الخاصة")
+            raise PermissionDenied("You can only update the status of your own shipment.")
 
         # GPS accuracy ≤ 30 meters validation
         acc = attrs.get("location_accuracy_m")
@@ -293,7 +292,7 @@ class StatusUpdateSerializer(serializers.ModelSerializer):
         # both latitude and longitude must be provided together
         lat, lng = attrs.get("latitude"), attrs.get("longitude")
         if (lat is None) ^ (lng is None):
-            raise serializers.ValidationError("يجب أن يكون كلا من خط العرض وخط الطول معًا")
+            raise serializers.ValidationError("Both latitude and longitude must be provided together.")
         return attrs
 
     def create(self, validated_data):
@@ -303,7 +302,7 @@ class StatusUpdateSerializer(serializers.ModelSerializer):
 
 
 
-# DRIVER STATUS (for manager dashboard) حالة تحديث الشحنة من السائق تعرض في تطبيق السائق 
+# DRIVER STATUS (for manager dashboard)
 class DriverStatusSerializer(serializers.ModelSerializer):
     name  = serializers.CharField(source="user.username", read_only=True)
     phone = serializers.CharField(source="user.phone",    read_only=True)
@@ -324,8 +323,8 @@ class DriverStatusSerializer(serializers.ModelSerializer):
     def get_status(self, obj):
         # busy if has active shipment
         if getattr(obj, "current_active_shipment_id", None):
-            return "مشغول"
+            return "Busy"
         # available if effectively active
         if getattr(obj, "effective_is_active", False):
-            return "متاح"
-        return "غير متاح"
+            return "Available"
+        return "Unavailable"

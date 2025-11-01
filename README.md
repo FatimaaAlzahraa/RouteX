@@ -36,7 +36,7 @@ The driver can:
 
 ## Tech Stack
 - **Backend:** Django 
-- **Database:** sqlite3  
+- **Database:** PostgreSQL  
 - **Authentication:** JWT Auth 
 - **API Type:** RESTful APIs
 -  

@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django import forms
-from .models import Driver, WarehouseManager, Warehouse,Customer, Shipment, StatusUpdate, Product
-
+from .models import Driver, WarehouseManager, Warehouse, Customer, Shipment, StatusUpdate, Product
 
 
 class DriverAdminForm(forms.ModelForm):
@@ -70,10 +69,9 @@ class CustomerAdmin(admin.ModelAdmin):
     list_per_page = 50
 
 
-
 class ShipmentAdminForm(forms.ModelForm):
     customer_address = forms.ChoiceField(
-        required=False,  
+        required=False,
         choices=[("", "Choose the client first—")],
         label="Customer address",
     )
@@ -124,11 +122,9 @@ class ShipmentAdminForm(forms.ModelForm):
         cust = cleaned.get("customer")
         addr = (cleaned.get("customer_address") or "").strip()
 
-
         if not cust:
             cleaned["customer_address"] = None
             return cleaned
-
 
         allowed = []
         for a in (cust.address, getattr(cust, "address2", ""), getattr(cust, "address3", "")):
@@ -137,21 +133,20 @@ class ShipmentAdminForm(forms.ModelForm):
                 allowed.append(a)
 
         if not allowed:
-            self.add_error("customer", "العميل المحدد ليس له أي عناوين محفوظة.")
-            self.add_error("customer_address", "لا يمكن حفظ الشحنة بدون عنوان للعميل.")
+            self.add_error("customer", "The selected customer has no saved addresses.")
+            self.add_error("customer_address", "The shipment cannot be saved without a customer address.")
             return cleaned
 
-    
         if len(allowed) == 1 and not addr:
             cleaned["customer_address"] = allowed[0]
             return cleaned
 
         if not addr:
-            self.add_error("customer_address", "الرجاء اختيار عنوان للعميل.")
+            self.add_error("customer_address", "Please choose a customer address.")
             return cleaned
 
         if addr not in allowed:
-            self.add_error("customer_address", "العنوان يجب أن يكون من عناوين العميل المحفوظة.")
+            self.add_error("customer_address", "The address must be one of the customer's saved addresses.")
             return cleaned
 
         cleaned["customer_address"] = addr
@@ -161,13 +156,13 @@ class ShipmentAdminForm(forms.ModelForm):
 @admin.register(Shipment)
 class ShipmentAdmin(admin.ModelAdmin):
     form = ShipmentAdminForm
-    autocomplete_fields = ("product" , "warehouse", "driver", "customer")
+    autocomplete_fields = ("product", "warehouse", "driver", "customer")
 
-    list_display = ("id", "product","warehouse", "driver", "customer",
+    list_display = ("id", "product", "warehouse", "driver", "customer",
                     "customer_address", "current_status", "created_at")
     list_filter = ("warehouse", "current_status")
     search_fields = ("id", "warehouse__name", "warehouse__location",
-                     "customer__name", "customer_address","product__name")
+                     "customer__name", "customer_address", "product__name")
     date_hierarchy = "created_at"
     ordering = ("-created_at",)
 
@@ -179,8 +174,6 @@ class ShipmentAdmin(admin.ModelAdmin):
         return initial
 
 
-
-
 @admin.register(StatusUpdate)
 class StatusUpdateAdmin(admin.ModelAdmin):
     autocomplete_fields = ["shipment"]
@@ -189,4 +182,3 @@ class StatusUpdateAdmin(admin.ModelAdmin):
     search_fields = ("shipment__id", "shipment__driver__user__username", "shipment__driver__user__phone")
     date_hierarchy = "timestamp"
     ordering = ("-timestamp",)
-
