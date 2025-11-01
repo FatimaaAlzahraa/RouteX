@@ -2,7 +2,7 @@
 from rest_framework import generics , status
 from django.db.models import Count, ProtectedError, OuterRef, Subquery, Case, When, Value, BooleanField, F,Q
 from rest_framework.response import Response
-from rest_framework import viewsets, filters
+from rest_framework import viewsets
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.utils.dateparse import parse_datetime
 from rest_framework import serializers as drf_serializers
@@ -222,7 +222,7 @@ class AutocompleteCustomersView(generics.ListAPIView):
 class DriverStatusView(viewsets.ReadOnlyModelViewSet):
     serializer_class  = DriverStatusSerializer
     permission_classes = [IsWarehouseManager]
-    filter_backends   = [filters.SearchFilter]
+    # filter_backends   = [filters.SearchFilter]
     search_fields     = ["user__username", "user__phone"]
 
     def get_queryset(self):

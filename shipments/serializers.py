@@ -10,7 +10,7 @@ from .models import (
 )
 
 
-# PRODUCTS (المنتجات)
+# PRODUCTS
 class ProductSerializer(serializers.ModelSerializer):
     shipments_count = serializers.IntegerField(read_only=True)
 
@@ -24,7 +24,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
 
 
-# SHIPMENTS (الطلبات)
+# SHIPMENTS
 class ShipmentSerializer(serializers.ModelSerializer):
     # السائق يمكن أن يكون فارغ (الشحنة غير مخصصة بعد)
     driver = serializers.PrimaryKeyRelatedField(
