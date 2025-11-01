@@ -26,7 +26,7 @@ The driver can:
 ---
 
 ## Key Features
-- **Role-Based Access Control:** Secure login and permissions for each user type  
+- **Role-Based Access Control:** Secure login and permissions for each user type
 - **Shipment Management:** Create, assign, and monitor shipment details  
 - **Driver Dashboard:** Real-time view of assigned deliveries  
 - **Status Updates:** Drivers can update shipment progress directly  
@@ -38,7 +38,8 @@ The driver can:
 - **Backend:** Django 
 - **Database:** sqlite3  
 - **Authentication:** JWT Auth 
-- **API Type:** RESTful APIs  
+- **API Type:** RESTful APIs
+-  
 
 ---
 
@@ -77,7 +78,7 @@ The driver can:
 
 ### Login as a Manager:
 
-- Create warehouses, clients, and shipments.
+- Create Product, warehouses, clients, and shipments.
 
 - Assign shipments to drivers.
 
@@ -95,7 +96,5 @@ The driver can:
 
 ### Live Demo
 Production: https://zahraaayop.pythonanywhere.com/admin
-- "usernamr": zahraa
-- "paswward": za1234za 
 
 
