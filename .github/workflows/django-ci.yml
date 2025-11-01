@@ -17,7 +17,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: 3.10
+          python-version: '3.10'   # <- كان عامل المشكلة
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
@@ -25,9 +26,11 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run migrations
-        run: |
-          python manage.py migrate
+        env:
+          DJANGO_SETTINGS_MODULE: RouteX.settings
+        run: python manage.py migrate
 
       - name: Run tests
-        run: |
-          python manage.py test
+        env:
+          DJANGO_SETTINGS_MODULE: RouteX.settings
+        run: python manage.py test
